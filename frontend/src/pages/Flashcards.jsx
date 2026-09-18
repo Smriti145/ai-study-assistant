@@ -3,21 +3,43 @@ import { post, request } from '../services/http'
 
 export default function Flashcards() {
   const [decks, setDecks] = useState([]), [documents, setDocuments] = useState([])
+  const [libraryError, setLibraryError] = useState('')
   const [title, setTitle] = useState(''), [text, setText] = useState(''), [documentId, setDocumentId] = useState(''), [count, setCount] = useState(10)
   const [deck, setDeck] = useState(null), [revealed, setRevealed] = useState(false), [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [revision, setRevision] = useState(0), [offset, setOffset] = useState(0)
   useEffect(() => {
     let active = true
-    Promise.all([request(`/flashcards/decks?offset=${offset}`), request('/documents/')]).then(([rows, docs]) => {
-      if (active) { setDecks(rows); setDocuments(docs.filter(d => d.processing_status === 'completed')) }
-    }).catch(e => { if (active) setError(e.message) })
+    Promise.allSettled([request(`/flashcards/decks?offset=${offset}`), request('/documents/')]).then(([rows, docs]) => {
+      if (!active) return
+      if (rows.status === 'fulfilled') setDecks(rows.value)
+      else setError(rows.reason.message)
+      if (docs.status === 'fulfilled') {
+        setDocuments(docs.value.filter(d => d.processing_status === 'completed'))
+        setLibraryError('')
+      } else {
+        setDocuments([])
+        setDocumentId('')
+        setLibraryError('Library documents could not be loaded. You can still generate cards from pasted notes.')
+      }
+    })
     return () => { active = false }
   }, [revision, offset])
   const due = deck?.cards.filter(c => new Date(c.due_at) <= new Date()) || []
   const card = due[0]
   async function action(fn) {
     setBusy(true); setError('')
-    try { await fn(); setRevision(x => x + 1) } catch (e) { setError(e.message) } finally { setBusy(false) }
+    try { await fn(); setRevision(x => x + 1) } catch (e) {
+      setError(e.message)
+      if (e.status === 409 && deck) {
+        try {
+          setDeck(await request(`/flashcards/decks/${deck.id}`))
+          setRevealed(false)
+          setEditing(null)
+          setRevision(x => x + 1)
+          setError('This card changed in another session. The deck has been refreshed; please review the latest version.')
+        } catch (refreshError) { setError(refreshError.message) }
+      }
+    } finally { setBusy(false) }
   }
   function open(id) { action(async () => { setDeck(await request(`/flashcards/decks/${id}`)); setRevealed(false); setEditing(null) }) }
   function generate(e) {
@@ -36,6 +58,7 @@ export default function Flashcards() {
   }) }
   return <div className="max-w-5xl mx-auto px-4 py-8"><p className="text-blue-600 text-sm mb-2">MAKE IT STICK</p><h1 className="text-3xl mb-2">Flashcards</h1><p className="text-gray-600 mb-6">Turn notes into a deck. Recall, reveal, and review at your own pace.</p>
     {error && <p role="alert" className="bg-red-50 text-red-700 rounded-lg p-4 mb-4">{error}</p>}
+    {libraryError && <p role="status" className="bg-gray-50 p-4 rounded-lg mb-4">{libraryError}</p>}
     <form onSubmit={generate} className="bg-white rounded-xl shadow-lg p-6 space-y-4"><h2 className="text-xl">Create a deck</h2>
       <label className="block">Deck title<input disabled={busy} required maxLength={120} value={title} onChange={e => setTitle(e.target.value)} className="block border rounded-lg p-3 w-full mt-2" placeholder="Biology: cell structure" /></label>
       <label className="block">Source<select disabled={busy} value={documentId} onChange={e => setDocumentId(e.target.value)} className="block border rounded-lg p-3 w-full mt-2"><option value="">Paste my notes</option>{documents.map(d => <option key={d.id} value={d.id}>{d.title}</option>)}</select></label>

@@ -1,14 +1,15 @@
 import json
 import unittest
-from test_workspace_integration import WorkspaceIntegration, app, get_llm_client, get_current_user_id
+import test_workspace_integration as fixtures
+from test_workspace_integration import app, get_llm_client, get_current_user_id
 
 class CardsAI:
     async def generate_response(self, prompt, **kwargs):
         return json.dumps({'cards': [{'front': f'Question {i}', 'back': f'Answer {i}'} for i in range(3)]})
 
 class FlashcardTests(unittest.IsolatedAsyncioTestCase):
-    asyncSetUp = WorkspaceIntegration.asyncSetUp
-    asyncTearDown = WorkspaceIntegration.asyncTearDown
+    asyncSetUp = fixtures.WorkspaceIntegration.asyncSetUp
+    asyncTearDown = fixtures.WorkspaceIntegration.asyncTearDown
 
     async def create(self, **extra):
         app.dependency_overrides[get_llm_client] = CardsAI
@@ -37,8 +38,19 @@ class FlashcardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.delete(f"/api/flashcards/decks/{deck['id']}")).status_code, 204)
         self.assertEqual((await self.client.get(f"/api/flashcards/decks/{deck['id']}")).status_code, 404)
 
+    async def test_stale_edit_cannot_overwrite_a_review(self):
+        deck = await self.create()
+        card = deck['cards'][0]
+        review = await self.client.post(f"/api/flashcards/cards/{card['id']}/review", json={'rating': 'again', 'version': 0})
+        self.assertEqual(review.status_code, 200)
+        stale = await self.client.patch(f"/api/flashcards/cards/{card['id']}", json={'front': 'stale overwrite', 'back': 'stale', 'version': 0})
+        self.assertEqual(stale.status_code, 409)
+        refreshed = (await self.client.get(f"/api/flashcards/decks/{deck['id']}")).json()['cards'][0]
+        self.assertEqual(refreshed['front'], card['front'])
+        self.assertEqual(refreshed['version'], 1)
+
     async def test_owner_and_document_source(self):
-        doc = await WorkspaceIntegration.upload(self)
+        doc = await fixtures.WorkspaceIntegration.upload(self)
         deck = await self.create(text=None, document_id=doc['id'])
         card = deck['cards'][0]
         app.dependency_overrides[get_current_user_id] = lambda: 999

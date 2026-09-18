@@ -6,8 +6,8 @@ recall. This is a simple interval scheduler, not a claim of scientifically measu
 
 - Again: 10 minutes; Hard: at least 1 day; Good: at least 1 day, then double;
   Easy: at least 4 days, then triple the prior interval.
-- Review/edit requests include the card version. Stale writes return 409; reopen
-  the deck to refresh. Future cards cannot be reviewed early.
+- Review/edit requests include the card version. Stale writes return 409; the web UI reloads the deck, resets the revealed answer,
+  and asks you to review the current card. Other API clients should reopen the deck. Future cards cannot be reviewed early.
 - Decks, cards, and review events persist in three additive tables created on startup.
 - Deleting a deck also deletes its cards and reviews, including their analytics.
 - All queries use the authenticated user dependency (currently shared-demo mode).
@@ -20,3 +20,6 @@ AI output must match the requested card count and contain unique, nonempty quest
 
 Run `PYTHONDONTWRITEBYTECODE=1 venv/bin/python -m unittest discover -s tests -p 'test_flashcards.py'`
 from backend. Live generation additionally needs a valid server-side Gemini key.
+
+Library loading is independent from deck loading. If the library is unavailable,
+pasted-note generation and saved-deck review remain available with a visible notice.

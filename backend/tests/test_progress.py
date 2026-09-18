@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime, timedelta
-from test_workspace_integration import WorkspaceIntegration, app, get_current_user_id
+import test_workspace_integration as fixtures
+from test_workspace_integration import app, get_current_user_id
 from app.core.database import AsyncSessionLocal
 from app.models.user import User
 from app.models.problem_attempt import ProblemAttempt, ProblemType
@@ -8,8 +9,8 @@ from app.models.solved_problem import SolvedProblem
 from app.models.flashcard import Deck, Flashcard, CardReview
 
 class ProgressTests(unittest.IsolatedAsyncioTestCase):
-    asyncSetUp = WorkspaceIntegration.asyncSetUp
-    asyncTearDown = WorkspaceIntegration.asyncTearDown
+    asyncSetUp = fixtures.WorkspaceIntegration.asyncSetUp
+    asyncTearDown = fixtures.WorkspaceIntegration.asyncTearDown
 
     async def test_periods_streak_and_ungraded_separation(self):
         app.dependency_overrides[get_current_user_id] = lambda: 777

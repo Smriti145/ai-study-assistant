@@ -1,7 +1,8 @@
 import io
 import json
 import unittest
-from test_workspace_integration import WorkspaceIntegration, app, get_llm_client, get_current_user_id
+import test_workspace_integration as fixtures
+from test_workspace_integration import app, get_llm_client, get_current_user_id
 from PIL import Image
 
 SOLUTION = {'problem': '2x + 5 = 13', 'hint': 'Subtract five.', 'steps': ['2x = 8', 'x = 4'], 'answer': '4', 'verification': '2 × 4 + 5 = 13'}
@@ -14,8 +15,8 @@ class SolverAI:
         return json.dumps(SOLUTION)
 
 class SolverTests(unittest.IsolatedAsyncioTestCase):
-    asyncSetUp = WorkspaceIntegration.asyncSetUp
-    asyncTearDown = WorkspaceIntegration.asyncTearDown
+    asyncSetUp = fixtures.WorkspaceIntegration.asyncSetUp
+    asyncTearDown = fixtures.WorkspaceIntegration.asyncTearDown
 
     async def test_saved_solution_is_not_practice_accuracy_and_is_owner_scoped(self):
         app.dependency_overrides[get_llm_client] = SolverAI

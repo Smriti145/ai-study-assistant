@@ -12,7 +12,9 @@ export async function request(path, options = {}) {
     const data = await response.json().catch(() => null)
     if (!response.ok) {
       const detail = data?.detail || data?.message
-      throw new Error(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map(item => item.msg).join('; ') : `Request failed (${response.status}). Please try again.`)
+      const error = new Error(typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map(item => item.msg).join('; ') : `Request failed (${response.status}). Please try again.`)
+      error.status = response.status
+      throw error
     }
     if (data === null) throw new Error('The API returned an invalid response. Check the backend URL.')
     return data
